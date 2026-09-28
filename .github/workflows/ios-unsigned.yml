@@ -97,7 +97,7 @@ jobs:
           PY
       - name: Exercise iOS storage, extensions and playback
         timeout-minutes: 20
-        run: flutter test integration_test/ios_port_smoke_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
+        run: flutter test --no-pub integration_test/ios_port_smoke_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json --dart-define=TETOTV_TEST_HEADLESS_AUDIO=true
       - name: Exercise Seanime extension compatibility
         timeout-minutes: 10
-        run: flutter test integration_test/seanime_addon_runtime_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
+        run: flutter test --no-pub integration_test/seanime_addon_runtime_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json

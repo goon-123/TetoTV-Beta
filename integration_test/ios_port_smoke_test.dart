@@ -70,6 +70,14 @@ void main() {
       final errors = <String>[];
       final subscription = player.stream.error.listen(errors.add);
       try {
+        // Hosted simulators have no audio output device. Decode audio into the
+        // null sink only for CI; normal simulator/device runs still use audio.
+        // Audible output must also be checked on a physical iPhone.
+        if (const bool.fromEnvironment('TETOTV_TEST_HEADLESS_AUDIO')) {
+          final platform = player.platform;
+          expect(platform, isA<NativePlayer>());
+          await (platform as NativePlayer).setProperty('ao', 'null');
+        }
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(body: Video(controller: controller)),
