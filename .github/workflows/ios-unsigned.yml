@@ -44,9 +44,35 @@ jobs:
             test/startup_device_classification_test.dart
 
   ios:
+    name: Package device IPA
     needs: verify
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Flutter
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_TAG" https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = "$FLUTTER_COMMIT"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+      - name: Build unsigned device IPA
+        env:
+          TETOTV_IOS_BUILD_NUMBER: ${{ github.run_number }}
+        run: bash tool/ios/build_unsigned_ipa.sh
+      - name: Save sideloading artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: TetoTV-iOS-unsigned
+          path: build/ios/ipa/TetoTV-iOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+  ios-smoke:
+    name: iPhone simulator checks
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Install pinned Flutter
@@ -57,6 +83,7 @@ jobs:
           "$RUNNER_TEMP/flutter/bin/flutter" --version
       - run: flutter pub get --enforce-lockfile
       - name: Select an iPhone simulator
+        timeout-minutes: 5
         run: |
           python3 - <<'PY'
           import json, os, subprocess
@@ -69,17 +96,8 @@ jobs:
               env.write('IOS_SIMULATOR_ID=' + device['udid'] + '\n')
           PY
       - name: Exercise iOS storage, extensions and playback
-        run: |
-          flutter test integration_test/ios_port_smoke_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
-          flutter test integration_test/seanime_addon_runtime_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
-      - name: Build unsigned device IPA
-        env:
-          TETOTV_IOS_BUILD_NUMBER: ${{ github.run_number }}
-        run: bash tool/ios/build_unsigned_ipa.sh
-      - name: Save sideloading artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: TetoTV-iOS-unsigned
-          path: build/ios/ipa/TetoTV-iOS-unsigned.ipa
-          if-no-files-found: error
-          retention-days: 14
+        timeout-minutes: 20
+        run: flutter test integration_test/ios_port_smoke_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
+      - name: Exercise Seanime extension compatibility
+        timeout-minutes: 10
+        run: flutter test integration_test/seanime_addon_runtime_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
