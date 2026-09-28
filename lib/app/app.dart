@@ -1,4 +1,5 @@
 import 'package:anime_tv/app/router.dart';
+import 'package:anime_tv/core/config/app_config.dart';
 import 'package:anime_tv/features/aniyomi/application/aniyomi_controller.dart';
 import 'package:anime_tv/core/localization/teto_localizations.dart';
 import 'package:anime_tv/features/settings/presentation/language_selection_screen.dart';
@@ -44,7 +45,11 @@ class TetoTvApp extends ConsumerWidget {
     ref.watch(discordPresenceControllerProvider);
     // Anonymous crash delivery is preference-gated and remains dormant until
     // encrypted settings have loaded. Native crashes are retried next launch.
-    ref.watch(anonymousCrashReporterProvider);
+    // Fork builds can omit the reporting service. Its client validates the
+    // endpoint at construction, so do not create it when it is disabled.
+    if (AppConfig.hasCrashReportEndpoint) {
+      ref.watch(anonymousCrashReporterProvider);
+    }
     // Beta-only aggregate activity is separately consent-gated. The reporter
     // owns no persistent identifier and Public builds remain fully dormant.
     ref.watch(anonymousUsageReporterProvider);
