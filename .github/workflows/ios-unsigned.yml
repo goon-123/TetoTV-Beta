@@ -41,7 +41,7 @@ jobs:
           flutter test --no-pub \
             test/ios_port_preferences_test.dart test/ios_port_updater_test.dart \
             test/settings_preferences_controller_test.dart test/app_update_controller_test.dart \
-            test/startup_device_classification_test.dart
+            test/startup_device_classification_test.dart test/watch_party_controller_test.dart
 
   ios:
     name: Package device IPA

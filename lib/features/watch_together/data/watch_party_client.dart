@@ -32,7 +32,7 @@ class WatchPartyJoined {
 
 class WatchPartyClient {
   WatchPartyClient({required String baseUrl, Dio? dio})
-    : _baseUri = _validOrigin(baseUrl),
+    : _configuredBaseUri = _validOrigin(baseUrl),
       _dio =
           dio ??
           Dio(
@@ -53,7 +53,16 @@ class WatchPartyClient {
             ),
           );
 
-  final Uri _baseUri;
+  /// Keeps global room state usable in builds without a Watch Together service.
+  /// Every room operation fails locally, before any network request.
+  WatchPartyClient.disabled({Dio? dio})
+    : _configuredBaseUri = null,
+      _dio = dio ?? Dio();
+
+  final Uri? _configuredBaseUri;
+  Uri get _baseUri =>
+      _configuredBaseUri ??
+      (throw const WatchPartyClientException('not_configured'));
   final Dio _dio;
   WatchPartyPublicIdentity? _publicIdentity;
 
@@ -327,6 +336,9 @@ class WatchPartyClient {
     bool authenticated = true,
     bool allowNoContent = false,
   }) async {
+    if (_configuredBaseUri == null) {
+      throw const WatchPartyClientException('not_configured');
+    }
     if (authenticated && token == null) {
       throw const WatchPartyClientException('party_token_required');
     }

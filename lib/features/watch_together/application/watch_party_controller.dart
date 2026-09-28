@@ -10,7 +10,9 @@ import 'package:anime_tv/features/watch_together/domain/watch_party_timeline.dar
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final watchPartyClientProvider = Provider<WatchPartyClient>((ref) {
-  final client = WatchPartyClient(baseUrl: AppConfig.watchTogetherBaseUrl);
+  final client = AppConfig.hasWatchTogether
+      ? WatchPartyClient(baseUrl: AppConfig.watchTogetherBaseUrl)
+      : WatchPartyClient.disabled();
 
   // Watch Parties can be opened directly from an episode or the player, so
   // the identity cannot be initialized only by WatchTogetherScreen. Keep the
@@ -1560,6 +1562,7 @@ String watchPartyAudienceLabel(int count) {
 
 String watchPartyFriendlyError(WatchPartyClientException error) =>
     switch (error.code) {
+      'not_configured' => 'Watch Together is unavailable in this build.',
       'invalid_room_code' =>
         'Enter the eight-digit room code using numbers 2-9 only.',
       'party_not_found' => 'That room ended or expired.',

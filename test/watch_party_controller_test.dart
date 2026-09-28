@@ -9,6 +9,45 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'an unavailable room service does not break app state or send requests',
+    () async {
+      var requests = 0;
+      final dio = Dio()
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              requests++;
+              handler.reject(DioException(requestOptions: options));
+            },
+          ),
+        );
+      final client = WatchPartyClient.disabled(dio: dio);
+      final controller = WatchPartyController(client);
+      addTearDown(controller.dispose);
+      addTearDown(dio.close);
+
+      expect(controller.state.isActive, isFalse);
+      expect(await controller.create(), isFalse);
+      expect(
+        controller.state.message,
+        'Watch Together is unavailable in this build.',
+      );
+      expect(await controller.join('23456789'), isFalse);
+      await expectLater(
+        client.health(),
+        throwsA(
+          isA<WatchPartyClientException>().having(
+            (error) => error.code,
+            'code',
+            'not_configured',
+          ),
+        ),
+      );
+      expect(requests, 0);
+    },
+  );
+
   test('room codes normalize separators but accept only digits 2-9', () {
     expect(normalizeWatchPartyCode('2345-6789'), '23456789');
     expect(normalizeWatchPartyCode(' 2345 6789 '), '23456789');

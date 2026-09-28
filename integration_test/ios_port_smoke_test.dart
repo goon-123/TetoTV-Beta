@@ -19,29 +19,33 @@ import 'package:sqflite/sqflite.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('real app startup reaches first-run setup', (tester) async {
-    final flutterErrorHandler = FlutterError.onError;
-    final platformErrorHandler = PlatformDispatcher.instance.onError;
-    try {
-      await app.main().timeout(const Duration(seconds: 20));
-      // The app installs production error reporting. Restore the test handler
-      // so an exception while building the actual app fails this check.
-      FlutterError.onError = flutterErrorHandler;
-      PlatformDispatcher.instance.onError = platformErrorHandler;
-      for (var attempt = 0; attempt < 80; attempt++) {
-        await tester.pump(const Duration(milliseconds: 250));
-        if (find.byType(LanguageSelectionScreen).evaluate().isNotEmpty) break;
+  testWidgets(
+    'real app startup reaches first-run setup',
+    (tester) async {
+      final flutterErrorHandler = FlutterError.onError;
+      final platformErrorHandler = PlatformDispatcher.instance.onError;
+      try {
+        await app.main().timeout(const Duration(seconds: 20));
+        // The app installs production error reporting. Restore the test handler
+        // so an exception while building the actual app fails this check.
+        FlutterError.onError = flutterErrorHandler;
+        PlatformDispatcher.instance.onError = platformErrorHandler;
+        for (var attempt = 0; attempt < 80; attempt++) {
+          await tester.pump(const Duration(milliseconds: 250));
+          if (find.byType(LanguageSelectionScreen).evaluate().isNotEmpty) break;
+        }
+        expect(find.byType(TetoTvApp), findsOneWidget);
+        expect(find.byType(LanguageSelectionScreen), findsOneWidget);
+        expect(find.byType(ErrorWidget), findsNothing);
+        expect(tester.takeException(), isNull);
+      } finally {
+        FlutterError.onError = flutterErrorHandler;
+        PlatformDispatcher.instance.onError = platformErrorHandler;
+        await tester.pumpWidget(const SizedBox.shrink());
       }
-      expect(find.byType(TetoTvApp), findsOneWidget);
-      expect(find.byType(LanguageSelectionScreen), findsOneWidget);
-      expect(find.byType(ErrorWidget), findsNothing);
-      expect(tester.takeException(), isNull);
-    } finally {
-      FlutterError.onError = flutterErrorHandler;
-      PlatformDispatcher.instance.onError = platformErrorHandler;
-      await tester.pumpWidget(const SizedBox.shrink());
-    }
-  }, timeout: const Timeout(Duration(minutes: 1)));
+    },
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
 
   testWidgets('iOS native storage, version and extension runtime', (
     tester,
