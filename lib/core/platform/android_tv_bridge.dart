@@ -526,6 +526,7 @@ class AndroidTvBridge {
 
   static final instance = AndroidTvBridge._();
   static const _channel = MethodChannel('dev.tetotv/android_tv');
+  static const _iosChannel = MethodChannel('dev.tetotv/ios');
   final _mediaActions = StreamController<MediaAction>.broadcast();
   final _discordEvents = StreamController<DiscordBridgeEvent>.broadcast();
   final _externalPlayerReturns = StreamController<void>.broadcast();
@@ -745,11 +746,16 @@ class AndroidTvBridge {
   }
 
   Future<AppVersionInfo> getAppVersion() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
       return const AppVersionInfo.unknown();
     }
     try {
-      final result = await _channel.invokeMapMethod<Object?, Object?>(
+      final channel = defaultTargetPlatform == TargetPlatform.iOS
+          ? _iosChannel
+          : _channel;
+      final result = await channel.invokeMapMethod<Object?, Object?>(
         'getAppVersion',
       );
       return result == null
@@ -927,7 +933,9 @@ class AndroidTvBridge {
   /// setup places its short-lived code and public-key fingerprint in the URI
   /// fragment, which Android's browser intent does not send to the web server.
   Future<bool> openExternalWebPage(Uri uri) async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
       return false;
     }
     if (uri.scheme != 'https' ||
@@ -936,7 +944,10 @@ class AndroidTvBridge {
         uri.hasQuery) {
       throw ArgumentError.value(uri, 'uri', 'A public HTTPS page is required.');
     }
-    return await _channel.invokeMethod<bool>('openExternalWebPage', {
+    final channel = defaultTargetPlatform == TargetPlatform.iOS
+        ? _iosChannel
+        : _channel;
+    return await channel.invokeMethod<bool>('openExternalWebPage', {
           'uri': uri.toString(),
         }) ??
         false;

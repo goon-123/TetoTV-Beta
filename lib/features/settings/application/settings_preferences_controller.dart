@@ -8,6 +8,7 @@ import 'package:anime_tv/core/preferences/playback_audio_preference.dart';
 import 'package:anime_tv/features/settings/application/setup_progress_controller.dart';
 import 'package:anime_tv/features/streaming/domain/debrid_service.dart';
 import 'package:anime_tv/features/streaming/domain/stream_ranking_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -831,13 +832,48 @@ const _phoneSetupPreferenceKeys = [
   _interfaceModeKey,
 ];
 
+SettingsPreferences supportedSettingsPreferences(
+  SettingsPreferences preferences,
+  TargetPlatform platform,
+) {
+  if (platform != TargetPlatform.iOS) return preferences;
+  return preferences.copyWith(
+    preferredPlayer: PreferredPlayer.mpv,
+    media3SurfaceViewEnabled: false,
+    externalPlayerEnabled: false,
+    clearSelectedExternalPlayer: true,
+    directTorrentStreamingEnabled: false,
+    subEpisodeNotificationsEnabled: false,
+    dubEpisodeNotificationsEnabled: false,
+  );
+}
+
 class SettingsPreferencesController extends StateNotifier<SettingsPreferences> {
   SettingsPreferencesController(
     this._storage, {
     this.readValue,
     this.writeValue,
     this.deleteValue,
-  }) : super(const SettingsPreferences());
+    TargetPlatform? platform,
+  }) : _platform = platform ?? defaultTargetPlatform,
+       super(
+         supportedSettingsPreferences(
+           const SettingsPreferences(),
+           platform ?? defaultTargetPlatform,
+         ),
+       );
+
+  final TargetPlatform _platform;
+
+  @override
+  SettingsPreferences get state => super.state;
+
+  @override
+  set state(SettingsPreferences value) {
+    // Apply this at the state boundary so restore, reset, imports and live
+    // changes cannot reactivate a native feature missing from this platform.
+    super.state = supportedSettingsPreferences(value, _platform);
+  }
 
   final FlutterSecureStorage _storage;
   final Future<String?> Function(String key)? readValue;

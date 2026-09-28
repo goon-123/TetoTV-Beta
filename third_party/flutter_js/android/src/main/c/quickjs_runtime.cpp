@@ -8,6 +8,9 @@
 #else
 #define __android_log_print(a, b, c, d)
 #endif
+#ifdef __APPLE__
+#include <pthread.h>
+#endif
 #include <algorithm>
 #include <functional>
 #include <future>
@@ -109,6 +112,28 @@ extern "C"
             return nativeSafeBudget;
         }
         return std::min(configuredStackBytes, nativeSafeBudget);
+#elif defined(__APPLE__)
+        // Darwin exposes the high address of its downward-growing stack.
+        // Clamp each entry to the current thread's remaining native stack;
+        // Dart worker isolates are much smaller than the iOS main thread.
+        constexpr size_t fallbackStackBytes = 128 * 1024;
+        const size_t fallback = configuredStackBytes == 0
+            ? fallbackStackBytes
+            : std::min(configuredStackBytes, fallbackStackBytes);
+        const uintptr_t high = reinterpret_cast<uintptr_t>(
+            pthread_get_stackaddr_np(pthread_self()));
+        const size_t bytes = pthread_get_stacksize_np(pthread_self());
+        if (high == 0 || bytes == 0 || bytes > high) return fallback;
+        const uintptr_t low = high - bytes;
+        volatile uint8_t marker = 0;
+        const uintptr_t current = reinterpret_cast<uintptr_t>(&marker);
+        if (current <= low || current > high) return fallback;
+        const size_t available = current - low;
+        constexpr size_t reserve = 256 * 1024;
+        const size_t safe = available > reserve
+            ? available - reserve : available / 2;
+        return configuredStackBytes == 0
+            ? safe : std::min(configuredStackBytes, safe);
 #else
         return configuredStackBytes;
 #endif

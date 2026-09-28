@@ -5,6 +5,7 @@ import 'package:anime_tv/core/notifications/app_notification.dart';
 import 'package:anime_tv/core/notifications/app_announcement_client.dart';
 import 'package:anime_tv/core/notifications/app_notification_store.dart';
 import 'package:anime_tv/core/config/app_config.dart';
+import 'package:anime_tv/core/platform/platform_capabilities.dart';
 import 'package:anime_tv/core/storage/storage_providers.dart';
 import 'package:anime_tv/features/settings/application/app_update_controller.dart';
 import 'package:flutter/foundation.dart';
@@ -21,7 +22,7 @@ final appNotificationControllerProvider =
       // Widget tests and source-development builds must never contact the
       // production announcement authority. Installed APKs are release builds;
       // parser/controller tests inject their own client explicitly.
-      final announcementClient = kReleaseMode
+      final announcementClient = kReleaseMode && !isIosPort
           ? AppAnnouncementClient(baseUrl: AppConfig.appAnnouncementBaseUrl)
           : null;
       final controller = AppNotificationController(

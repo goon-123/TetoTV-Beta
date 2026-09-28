@@ -8,8 +8,11 @@
 #import "flutter_js-Swift.h"
 #endif
 
+extern void tetoEnsureQuickJSLinked(void);
+
 @implementation FlutterJsPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
+  tetoEnsureQuickJSLinked();
   [SwiftFlutterJsPlugin registerWithRegistrar:registrar];
 }
 @end

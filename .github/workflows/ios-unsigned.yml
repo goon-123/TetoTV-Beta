@@ -1,0 +1,85 @@
+name: iOS unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios-port]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-port-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  COCOAPODS_DISABLE_STATS: 'true'
+  FLUTTER_COMMIT: 058e0af2c2b57e369d905a03ac9748b0ebf543c6
+  FLUTTER_TAG: 3.44.8
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Flutter
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_TAG" https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = "$FLUTTER_COMMIT"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-pub --no-fatal-infos
+      - name: Build shared QuickJS test library
+        run: python3 tool/ios/build_host_quickjs.py
+      - name: Check iOS policy and extension compatibility
+        run: |
+          export LIBQUICKJSC_TEST_PATH="$GITHUB_WORKSPACE/build/ios-port-tests/libtetotv_quickjs.so"
+          flutter test --no-pub \
+            test/ios_port_preferences_test.dart test/ios_port_updater_test.dart \
+            test/settings_preferences_controller_test.dart test/app_update_controller_test.dart \
+            test/startup_device_classification_test.dart
+
+  ios:
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Flutter
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_TAG" https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = "$FLUTTER_COMMIT"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+      - run: flutter pub get --enforce-lockfile
+      - name: Select an iPhone simulator
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          runtimes = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '--json']))['devices']
+          device = next(d for runtime, devices in runtimes.items() if '.iOS-' in runtime for d in devices if d['name'].startswith('iPhone'))
+          if device['state'] != 'Booted':
+              subprocess.run(['xcrun', 'simctl', 'boot', device['udid']], check=True)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', device['udid'], '-b'], check=True)
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('IOS_SIMULATOR_ID=' + device['udid'] + '\n')
+          PY
+      - name: Exercise iOS storage, extensions and playback
+        run: |
+          flutter test integration_test/ios_port_smoke_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
+          flutter test integration_test/seanime_addon_runtime_test.dart -d "$IOS_SIMULATOR_ID" --dart-define-from-file=config/ios.json
+      - name: Build unsigned device IPA
+        env:
+          TETOTV_IOS_BUILD_NUMBER: ${{ github.run_number }}
+        run: bash tool/ios/build_unsigned_ipa.sh
+      - name: Save sideloading artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: TetoTV-iOS-unsigned
+          path: build/ios/ipa/TetoTV-iOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14

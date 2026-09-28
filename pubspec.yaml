@@ -25,6 +25,8 @@ dependencies:
   # fallback to upstream prebuilt native binaries.
   media_kit_libs_android_video:
     path: third_party/media_kit_libs_android_video
+  # The iOS port uses MPV through media_kit. Keep Android's audited adapter.
+  media_kit_libs_ios_video: 1.1.4
   media_kit_video: ^2.0.1
   qr_flutter: ^4.1.0
   cached_network_image: ^3.4.1
@@ -58,6 +60,8 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
   image_path: "assets/branding/tetotv_icon.png"
   adaptive_icon_background: "#030303"
   adaptive_icon_foreground: "assets/branding/tetotv_icon.png"
@@ -66,6 +70,8 @@ flutter_launcher_icons:
   min_sdk_android: 21
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
     - assets/branding/tetotv_icon.png

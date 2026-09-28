@@ -11,6 +11,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('sanitizes untrusted addon request and playback headers', () {
     final headers = sanitizeAddonHeaders({
       'Referer': 'https://example.com/',

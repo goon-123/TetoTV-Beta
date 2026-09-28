@@ -7,6 +7,7 @@ import 'package:anime_tv/core/preferences/caption_language.dart';
 import 'package:anime_tv/core/preferences/title_language_preference.dart';
 import 'package:anime_tv/core/preferences/playback_audio_preference.dart';
 import 'package:anime_tv/core/platform/android_tv_bridge.dart';
+import 'package:anime_tv/core/platform/platform_capabilities.dart';
 import 'package:anime_tv/core/storage/tetotv_database.dart';
 import 'package:anime_tv/core/theme/app_theme.dart';
 import 'package:anime_tv/core/tv/tv_focusable.dart';
@@ -6556,21 +6557,23 @@ class _CustomizationPanel extends StatelessWidget {
                   showDivider: true,
                   onSelected: controller.setPreferredAudioLanguage,
                 ),
-                _AppearanceToggleRow(
-                  label: 'Open externally',
-                  subtitle:
-                      'Offer installed video players for compatible, header-free streams.',
-                  icon: Icons.open_in_new_rounded,
-                  value: preferences.externalPlayerEnabled,
-                  showDivider: true,
-                  onChanged: controller.setExternalPlayerEnabled,
-                ),
-                const _SettingsSupportingText(
-                  'Adds an Open externally action for compatible streams. '
-                  'Turning this off returns an external default to Media3; '
-                  'your built-in player choice stays selected. TetoTV never '
-                  'shares account headers or private-server credentials.',
-                ),
+                if (!isIosPort) ...[
+                  _AppearanceToggleRow(
+                    label: 'Open externally',
+                    subtitle:
+                        'Offer installed video players for compatible, header-free streams.',
+                    icon: Icons.open_in_new_rounded,
+                    value: preferences.externalPlayerEnabled,
+                    showDivider: true,
+                    onChanged: controller.setExternalPlayerEnabled,
+                  ),
+                  const _SettingsSupportingText(
+                    'Adds an Open externally action for compatible streams. '
+                    'Turning this off returns an external default to Media3; '
+                    'your built-in player choice stays selected. TetoTV never '
+                    'shares account headers or private-server credentials.',
+                  ),
+                ],
                 _AppearanceSelectionRow<int>(
                   label: 'Rewind',
                   icon: Icons.replay_10_rounded,
@@ -6693,11 +6696,12 @@ class _ExternalPlayerDefaultSelectionState
             label: 'MPV (Built in)',
             detail: 'Compatibility engine with full TetoTV controls',
           ),
-          const _SettingsOption(
-            value: _media3Value,
-            label: 'Media3 (Built in)',
-            detail: 'Default Android engine with the same TetoTV controls',
-          ),
+          if (!isIosPort)
+            const _SettingsOption(
+              value: _media3Value,
+              label: 'Media3 (Built in)',
+              detail: 'Default Android engine with the same TetoTV controls',
+            ),
           for (final player in installed)
             _SettingsOption(
               value: player.packageName,
@@ -6760,12 +6764,13 @@ class _ExternalPlayerDefaultSelectionState
                 );
               },
             ),
-            _SettingsSupportingText(
-              snapshot.connectionState == ConnectionState.waiting
-                  ? 'Checking installed video players…'
-                  : 'External apps can only receive safe, header-free streams. '
-                        'Private Plex and Jellyfin sessions stay in TetoTV.',
-            ),
+            if (!isIosPort)
+              _SettingsSupportingText(
+                snapshot.connectionState == ConnectionState.waiting
+                    ? 'Checking installed video players…'
+                    : 'External apps can only receive safe, header-free streams. '
+                          'Private Plex and Jellyfin sessions stay in TetoTV.',
+              ),
           ],
         );
       },

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:anime_tv/core/platform/android_tv_bridge.dart';
+import 'package:anime_tv/core/platform/platform_capabilities.dart';
 import 'package:anime_tv/features/auth/application/pairing_controller.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -69,6 +70,7 @@ final appUpdateControllerProvider =
         ),
         apkInspector: bridge.inspectApk,
         automaticCheckInterval: const Duration(minutes: 5),
+        canInstallUpdates: supportsApkUpdates,
       );
       Future.microtask(controller.load);
       return controller;
@@ -917,6 +919,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
     AppReleaseSource? betaReleaseSource,
     this.automaticCheckInterval = const Duration(hours: 12),
     this.apkInspector,
+    this.canInstallUpdates = true,
   }) : _betaReleaseSource = betaReleaseSource ?? _releaseSource,
        super(const AppUpdateState());
 
@@ -929,6 +932,19 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
   final ApkInstaller _apkInstaller;
   final Duration automaticCheckInterval;
   final ApkInspector? apkInspector;
+  final bool canInstallUpdates;
+
+  bool _rejectUnsupportedUpdate() {
+    if (canInstallUpdates) return false;
+    if (mounted) {
+      state = state.copyWith(
+        phase: AppUpdatePhase.idle,
+        automaticUpdates: false,
+        message: 'Install updates with your sideloading app.',
+      );
+    }
+    return true;
+  }
 
   bool _loaded = false;
   Future<void>? _loadRequest;
@@ -972,7 +988,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
     state = state.copyWith(
       loaded: true,
       currentVersion: installedVersion,
-      automaticUpdates: values[1] != 'false',
+      automaticUpdates: canInstallUpdates && values[1] != 'false',
       developerMode: developerMode,
       updateChannel: updateChannel,
     );
@@ -1048,6 +1064,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
   }
 
   Future<void> _refreshReleaseHistory() async {
+    if (_rejectUnsupportedUpdate()) return;
     if (!mounted || !state.developerMode || state.releaseHistoryLoading) return;
     state = state.copyWith(releaseHistoryLoading: true);
     try {
@@ -1085,6 +1102,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
 
   Future<void> installReleaseFromHistory(AppReleaseInfo release) async {
     await load();
+    if (_rejectUnsupportedUpdate()) return;
     if (!state.developerMode || state.isBusy) return;
     AppReleaseInfo? selected;
     for (final candidate in state.releaseHistory) {
@@ -1138,6 +1156,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
   }
 
   Future<void> setAutomaticUpdates(bool enabled) async {
+    if (_rejectUnsupportedUpdate()) return;
     await load();
     await _storage.write(
       key: automaticUpdatesStorageKey,
@@ -1185,6 +1204,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
     bool downloadAvailable = true,
   }) async {
     await load();
+    if (_rejectUnsupportedUpdate()) return;
     if (state.isBusy) return;
     final stateBeforeCheck = state;
     if (automatic) {
@@ -1340,6 +1360,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
     bool launchInstaller = false,
   }) async {
     await load();
+    if (_rejectUnsupportedUpdate()) return;
     final selected = release ?? state.release;
     if (selected == null || state.isBusy) return;
     state = state.copyWith(
@@ -1465,6 +1486,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
       : '${lastAutomaticUpdateCheckStorageKey}_${state.updateChannel.name}';
 
   Future<void> installDownloadedUpdate() async {
+    if (_rejectUnsupportedUpdate()) return;
     final apkPath = state.downloadedPath;
     if (apkPath == null || state.isBusy) return;
     state = state.copyWith(
