@@ -1,7 +1,11 @@
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
+import 'package:anime_tv/app/app.dart';
 import 'package:anime_tv/core/platform/android_tv_bridge.dart';
 import 'package:anime_tv/features/marketplace/data/typescript_compiler.dart';
+import 'package:anime_tv/features/settings/presentation/language_selection_screen.dart';
+import 'package:anime_tv/main.dart' as app;
 import 'package:flutter/material.dart';
 import 'package:flutter_js/quickjs/quickjs_runtime2.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -14,6 +18,30 @@ import 'package:sqflite/sqflite.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('real app startup reaches first-run setup', (tester) async {
+    final flutterErrorHandler = FlutterError.onError;
+    final platformErrorHandler = PlatformDispatcher.instance.onError;
+    try {
+      await app.main().timeout(const Duration(seconds: 20));
+      // The app installs production error reporting. Restore the test handler
+      // so an exception while building the actual app fails this check.
+      FlutterError.onError = flutterErrorHandler;
+      PlatformDispatcher.instance.onError = platformErrorHandler;
+      for (var attempt = 0; attempt < 80; attempt++) {
+        await tester.pump(const Duration(milliseconds: 250));
+        if (find.byType(LanguageSelectionScreen).evaluate().isNotEmpty) break;
+      }
+      expect(find.byType(TetoTvApp), findsOneWidget);
+      expect(find.byType(LanguageSelectionScreen), findsOneWidget);
+      expect(find.byType(ErrorWidget), findsNothing);
+      expect(tester.takeException(), isNull);
+    } finally {
+      FlutterError.onError = flutterErrorHandler;
+      PlatformDispatcher.instance.onError = platformErrorHandler;
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  }, timeout: const Timeout(Duration(minutes: 1)));
 
   testWidgets('iOS native storage, version and extension runtime', (
     tester,
