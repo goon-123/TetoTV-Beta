@@ -102,19 +102,23 @@ void main() {
       final errors = <String>[];
       final subscription = player.stream.error.listen(errors.add);
       try {
+        // VideoController waits for a frame before native initialization.
+        // Mount first: setProperty waits for that initialization to complete.
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: Video(controller: controller)),
+          ),
+        );
         // Hosted simulators have no audio output device. Decode audio into the
         // null sink only for CI; normal simulator/device runs still use audio.
         // Audible output must also be checked on a physical iPhone.
         if (const bool.fromEnvironment('TETOTV_TEST_HEADLESS_AUDIO')) {
           final platform = player.platform;
           expect(platform, isA<NativePlayer>());
-          await (platform as NativePlayer).setProperty('ao', 'null');
+          await (platform as NativePlayer)
+              .setProperty('ao', 'null')
+              .timeout(const Duration(seconds: 30));
         }
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(body: Video(controller: controller)),
-          ),
-        );
         final hasDuration = player.stream.duration
             .firstWhere((duration) => duration > Duration.zero)
             .timeout(const Duration(seconds: 30));
@@ -130,6 +134,9 @@ void main() {
             .timeout(const Duration(seconds: 30));
         await player.play();
         await advances;
+        await controller.waitUntilFirstFrameRendered.timeout(
+          const Duration(seconds: 30),
+        );
         expect(errors, isEmpty);
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
