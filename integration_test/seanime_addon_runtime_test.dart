@@ -482,6 +482,65 @@ void main() {
   );
 
   testWidgets(
+    'unrelated missing functions do not trigger a legacy search retry',
+    (tester) async {
+      final manifest = MarketplaceAddon.tryParse({
+        'id': 'missing-function-fixture',
+        'name': 'Missing Function Fixture',
+        'manifestURI': 'https://example.com/manifest.json',
+        'payloadURI': 'https://example.com/provider.js',
+        'version': '1.0.0',
+        'type': 'onlinestream-provider',
+        'language': 'javascript',
+      }, repositoryUrl: 'https://example.com/catalog.json')!;
+      final addon = InstalledStreamingAddon(
+        manifest: manifest,
+        payload: r'''
+          class Provider {
+            getSettings() { return {supportsDub: false}; }
+            async search(input) {
+              if (typeof input === 'string') {
+                return [{id: 'unexpected-retry', title: input}];
+              }
+              const helper = {};
+              helper.missingFunction();
+            }
+            async findEpisodes() { return [{id: 'episode-1', number: 1}]; }
+            async findEpisodeServer() {
+              return {sources: [{url: 'https://example.com/unexpected-retry.mp4'}]};
+            }
+          }
+        ''',
+        enabled: true,
+        installedAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      );
+
+      await expectLater(
+        SeanimeJavascriptProvider(
+          addon,
+          validateResultTarget: (_) async {},
+        ).streams(
+          const EpisodeReference(
+            anilistMediaId: 1,
+            title: 'Missing Function Fixture',
+            episode: 1,
+          ),
+        ),
+        throwsA(
+          predicate<Object>(
+            (error) =>
+                seanimeProviderFailureDetails(error)?.stage == 'search' &&
+                seanimeProviderFailureDetails(error)?.reason ==
+                    'provider_error',
+          ),
+        ),
+      );
+    },
+    timeout: const Timeout(Duration(seconds: 45)),
+  );
+
+  testWidgets(
     'packaged QuickJS interrupts non-terminating scripts',
     (tester) async {
       final runtime = QuickJsRuntime2(timeout: 100);

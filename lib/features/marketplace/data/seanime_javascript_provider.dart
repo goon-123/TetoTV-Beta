@@ -2297,8 +2297,13 @@ Future<List<Map<String, dynamic>>> _executeProvider(
             }
             return 'provider_error';
           };
-          const isSearchArgumentShapeError = error => {
+          const isSearchArgumentShapeError = (error, readMissingStringMethod) => {
             const message = String(error && error.message || error || '');
+            // QuickJS omits the receiver/method from this TypeError. Only
+            // adapt it when the search object was read as a string; a missing
+            // function elsewhere in the provider must remain a runtime error.
+            if (readMissingStringMethod && error && error.name === 'TypeError' &&
+                message.toLowerCase() === 'not a function') return true;
             return /argument|expected(?: an?)? (?:string|object)|cannot read (?:properties|property) of (?:undefined|null)|(?:undefined|null) is not an object|(?:replace|trim|tolowercase) is not a function|cannot convert (?:undefined|null)/i
               .test(message);
           };
@@ -2783,13 +2788,22 @@ Future<List<Map<String, dynamic>>> _executeProvider(
             let runLegacySearch = providerRequiresLegacySearch;
             if (!providerRequiresLegacySearch) {
               for (const title of modeTitles) {
-                const searchInput = {
+                let readMissingStringMethod = false;
+                const searchInput = new Proxy({
                   query: title,
                   dub,
                   year: releaseYear,
                   media,
                   opts: {dub, year: releaseYear, media},
-                };
+                }, {
+                  get(target, key, receiver) {
+                    const value = Reflect.get(target, key, receiver);
+                    readMissingStringMethod = value === undefined &&
+                      typeof key === 'string' &&
+                      typeof String.prototype[key] === 'function';
+                    return value;
+                  },
+                });
                 searchAttempts += 1;
                 try {
                   const rawMatches = await providerCall(
@@ -2805,7 +2819,9 @@ Future<List<Map<String, dynamic>>> _executeProvider(
                   addMatches(matches, title);
                 } catch (error) {
                   errors.push({stage: 'search', reason: providerReason(error)});
-                  canonicalShapeFailure = isSearchArgumentShapeError(error);
+                  canonicalShapeFailure = isSearchArgumentShapeError(
+                    error, readMissingStringMethod,
+                  );
                   canonicalSearchFailure = !canonicalShapeFailure;
                   if (canonicalShapeFailure) providerRequiresLegacySearch = true;
                   if (canonicalSearchFailure) providerSearchRuntimeFailed = true;
